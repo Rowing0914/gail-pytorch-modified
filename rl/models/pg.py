@@ -3,7 +3,7 @@ import torch
 
 from torch.nn import Module
 
-from models.nets import PolicyNetwork, ValueNetwork
+from rl.models.nets import PolicyNetwork, ValueNetwork
 
 if torch.cuda.is_available():
     from torch.cuda import FloatTensor

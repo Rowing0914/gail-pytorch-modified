@@ -3,8 +3,8 @@ import torch
 
 from torch.nn import Module
 
-from models.nets import PolicyNetwork, ValueNetwork
-from utils.funcs import get_flat_grads, get_flat_params, set_params, \
+from rl.models.nets import PolicyNetwork, ValueNetwork
+from rl.utils.funcs import get_flat_grads, get_flat_params, set_params, \
     conjugate_gradient, rescale_and_linesearch
 
 if torch.cuda.is_available():
@@ -81,7 +81,7 @@ class TRPO(Module):
                 t = 0
                 done = False
 
-                ob = env.reset()
+                (ob, _) = env.reset()
 
                 while not done and steps < num_steps_per_iter:
                     act = self.act(ob)
@@ -91,7 +91,8 @@ class TRPO(Module):
 
                     if render:
                         env.render()
-                    ob, rwd, done, info = env.step(act)
+                    ob, rwd, done, truncated, _ = env.step(act)
+                    done = truncated or done
 
                     ep_rwds.append(rwd)
                     ep_disc_rwds.append(rwd * (discount ** t))
