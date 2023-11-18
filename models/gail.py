@@ -59,9 +59,6 @@ class GAIL(Module):
 
         opt_d = torch.optim.Adam(self.d.parameters())
         
-        # if self.args.wandb:
-        #     wandb.log(data={"eval/ep_return": eval_return}, step=0)
-
         # collect demo
         exp_rwd_iter, exp_obs, exp_acts = [], [], []
         steps = 0
@@ -88,6 +85,8 @@ class GAIL(Module):
         exp_rwd_mean = np.mean(exp_rwd_iter)
         print("Expert Reward Mean: {}".format(exp_rwd_mean))
         exp_obs, exp_acts = FloatTensor(np.array(exp_obs)), FloatTensor(np.array(exp_acts))
+        if self.args.wandb:
+            wandb.log(data={"expert/ep_return": exp_rwd_mean}, step=0)
 
         # Train agent
         rwd_iter_means = []
@@ -138,6 +137,8 @@ class GAIL(Module):
 
             rwd_iter_means.append(np.mean(rwd_iter))
             print("Iterations: {},   Reward Mean: {}".format(i + 1, np.mean(rwd_iter)))
+            if self.args.wandb:
+                wandb.log(data={"agent/ep_return": np.mean(rwd_iter)}, step=i + 1)
 
             obs = FloatTensor(np.array(obs))
             acts = FloatTensor(np.array(acts))

@@ -2,7 +2,7 @@ import os
 import json
 import pickle
 import argparse
-
+import wandb
 import torch
 import gym
 
@@ -15,7 +15,7 @@ def main(args):
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    if args.env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
+    if args.env_name not in ["CartPole-v1", "Pendulum-v1", "BipedalWalker-v3"]:
         print("The environment name is wrong!")
         return
 
