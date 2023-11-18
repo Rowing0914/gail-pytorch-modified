@@ -10,36 +10,36 @@ from models.nets import Expert
 from models.gail import GAIL
 
 
-def main(env_name):
+def main(args):
     ckpt_path = "ckpts"
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    if env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
+    if args.env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
         print("The environment name is wrong!")
         return
 
     expert_ckpt_path = "experts"
-    expert_ckpt_path = os.path.join(expert_ckpt_path, env_name)
+    expert_ckpt_path = os.path.join(expert_ckpt_path, args.env_name)
 
     with open(os.path.join(expert_ckpt_path, "model_config.json")) as f:
         expert_config = json.load(f)
 
-    ckpt_path = os.path.join(ckpt_path, env_name)
+    ckpt_path = os.path.join(ckpt_path, args.env_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
     with open("config.json") as f:
-        config = json.load(f)[env_name]
+        config = json.load(f)[args.env_name]
 
     with open(os.path.join(ckpt_path, "model_config.json"), "w") as f:
         json.dump(config, f, indent=4)
 
-    env = gym.make(env_name)
+    env = gym.make(args.env_name)
     env.reset()
 
     state_dim = len(env.observation_space.high)
-    if env_name in ["CartPole-v1"]:
+    if args.env_name in ["CartPole-v1"]:
         discrete = True
         action_dim = env.action_space.n
     else:
@@ -54,7 +54,7 @@ def main(env_name):
     expert = Expert(state_dim, action_dim, discrete, **expert_config).to(device)
     expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
 
-    model = GAIL(state_dim, action_dim, discrete, config).to(device)
+    model = GAIL(state_dim, action_dim, discrete, config, args).to(device)
     results = model.train(env, expert)
     env.close()
 
@@ -84,4 +84,4 @@ if __name__ == "__main__":
         wandb.init(project=args.wb_project, entity=args.wb_entity, name=args.wb_run, group=args.wb_group, dir="/tmp/wandb")
         wandb.config.update(args)
 
-    main(**vars(args))
+    main(args)

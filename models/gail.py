@@ -4,8 +4,7 @@ import torch
 from torch.nn import Module
 
 from models.nets import PolicyNetwork, ValueNetwork, Discriminator
-from utils.funcs import get_flat_grads, get_flat_params, set_params, \
-    conjugate_gradient, rescale_and_linesearch
+from utils.funcs import get_flat_grads, get_flat_params, set_params, conjugate_gradient, rescale_and_linesearch
 
 if torch.cuda.is_available():
     from torch.cuda import FloatTensor
@@ -20,10 +19,12 @@ class GAIL(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
+        train_config=None,
+        args=None
     ) -> None:
         super().__init__()
 
+        self.args = args
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
@@ -31,7 +32,6 @@ class GAIL(Module):
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
         self.v = ValueNetwork(self.state_dim)
-
         self.d = Discriminator(self.state_dim, self.action_dim, self.discrete)
 
     def get_networks(self):
@@ -39,12 +39,9 @@ class GAIL(Module):
 
     def act(self, state):
         self.pi.eval()
-
         state = FloatTensor(state)
         distb = self.pi(state)
-
         action = distb.sample().detach().cpu().numpy()
-
         return action
 
     def train(self, env, expert, render=False):
@@ -61,19 +58,19 @@ class GAIL(Module):
         normalize_advantage = self.train_config["normalize_advantage"]
 
         opt_d = torch.optim.Adam(self.d.parameters())
+        
+        # if self.args.wandb:
+        #     wandb.log(data={"eval/ep_return": eval_return}, step=0)
+
+        # collect demo
         exp_rwd_iter, exp_obs, exp_acts = [], [], []
         steps = 0
-        
-        if args.wandb:
-            wandb.log(data={"eval/ep_return": eval_return}, step=0)
-
         while steps < num_steps_per_iter:
             ep_obs, ep_rwds, t = [], [], 0
             (ob, _), done = env.reset(), False
 
             while not done and steps < num_steps_per_iter:
                 act = expert.act(ob)
-
                 ep_obs.append(ob); exp_obs.append(ob); exp_acts.append(act)
 
                 if render:
@@ -85,23 +82,14 @@ class GAIL(Module):
                 t += 1
                 steps += 1
 
-                # if horizon is not None:
-                #     if t >= horizon:
-                #         done = True
-                #         break
-
             if done:
                 exp_rwd_iter.append(np.sum(ep_rwds))
 
-            ep_obs = FloatTensor(np.array(ep_obs))
-            ep_rwds = FloatTensor(ep_rwds)
-
         exp_rwd_mean = np.mean(exp_rwd_iter)
         print("Expert Reward Mean: {}".format(exp_rwd_mean))
+        exp_obs, exp_acts = FloatTensor(np.array(exp_obs)), FloatTensor(np.array(exp_acts))
 
-        exp_obs = FloatTensor(np.array(exp_obs))
-        exp_acts = FloatTensor(np.array(exp_acts))
-
+        # Train agent
         rwd_iter_means = []
         for i in range(num_iters):
             rwd_iter, obs, acts, rets, advs, gms = [], [], [], [], [], []
@@ -113,7 +101,6 @@ class GAIL(Module):
 
                 while not done and steps < num_steps_per_iter:
                     act = self.act(ob)
-
                     ep_obs.append(ob); obs.append(ob); ep_acts.append(act); acts.append(act)
 
                     if render:
@@ -122,14 +109,8 @@ class GAIL(Module):
                     done = truncated or done
 
                     ep_rwds.append(rwd); ep_gms.append(gae_gamma ** t); ep_lmbs.append(gae_lambda ** t)
-
                     t += 1
                     steps += 1
-
-                    # if horizon is not None:
-                    #     if t >= horizon:
-                    #         done = True
-                    #         break
 
                 if done:
                     rwd_iter.append(np.sum(ep_rwds))
@@ -137,13 +118,11 @@ class GAIL(Module):
                 ep_obs = FloatTensor(np.array(ep_obs))
                 ep_acts = FloatTensor(np.array(ep_acts))
                 ep_rwds = FloatTensor(ep_rwds)
-                # ep_disc_rwds = FloatTensor(ep_disc_rwds)
                 ep_gms = FloatTensor(ep_gms)
                 ep_lmbs = FloatTensor(ep_lmbs)
 
                 ep_costs = (-1) * torch.log(self.d(ep_obs, ep_acts)).squeeze().detach()
                 ep_disc_costs = ep_gms * ep_costs
-
                 ep_disc_rets = FloatTensor([sum(ep_disc_costs[i:]) for i in range(t)])
                 ep_rets = ep_disc_rets / ep_gms
 
@@ -153,7 +132,6 @@ class GAIL(Module):
                 curr_vals = self.v(ep_obs).detach()
                 next_vals = torch.cat((self.v(ep_obs)[1:], FloatTensor([[0.]]))).detach()
                 ep_deltas = ep_costs.unsqueeze(-1) + gae_gamma * next_vals - curr_vals
-
                 ep_advs = FloatTensor([((ep_gms * ep_lmbs)[:t - j].unsqueeze(-1) * ep_deltas[j:]).sum() for j in range(t)])
                 advs.append(ep_advs)
                 gms.append(ep_gms)
@@ -173,13 +151,13 @@ class GAIL(Module):
             self.d.train()
             exp_scores = self.d.get_logits(exp_obs, exp_acts)
             nov_scores = self.d.get_logits(obs, acts)
-
             opt_d.zero_grad()
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(exp_scores, torch.zeros_like(exp_scores)) \
-                + torch.nn.functional.binary_cross_entropy_with_logits(nov_scores, torch.ones_like(nov_scores))
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(exp_scores, torch.zeros_like(exp_scores))
+            loss += torch.nn.functional.binary_cross_entropy_with_logits(nov_scores, torch.ones_like(nov_scores))
             loss.backward()
             opt_d.step()
 
+            # === TRPO update
             self.v.train()
             old_params = get_flat_params(self.v).detach()
             old_v = self.v(obs).detach()
