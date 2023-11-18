@@ -22,9 +22,9 @@ def main(env_name, model_name):
         print("The model name is wrong!")
         return
 
-    if env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
-        print("The environment name is wrong!")
-        return
+    # if env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
+    #     print("The environment name is wrong!")
+    #     return
 
     ckpt_path = os.path.join(ckpt_path, model_name)
     if not os.path.isdir(ckpt_path):

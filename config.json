@@ -11,7 +11,7 @@
         "cg_damping": 0.1,
         "normalize_advantage": true
     },
-    "Pendulum-v0": {
+    "Pendulum-v1": {
         "num_iters": 500,
         "num_steps_per_iter": 2000,
         "horizon": null,
