@@ -15,35 +15,20 @@ def main(args):
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    if args.env_name not in ["CartPole-v1", "Pendulum-v1", "BipedalWalker-v3"]:
-        print("The environment name is wrong!")
-        return
-
     expert_ckpt_path = "experts"
     expert_ckpt_path = os.path.join(expert_ckpt_path, args.env_name)
-
-    with open(os.path.join(expert_ckpt_path, "model_config.json")) as f:
-        expert_config = json.load(f)
 
     ckpt_path = os.path.join(ckpt_path, args.env_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    with open("config.json") as f:
-        config = json.load(f)[args.env_name]
-
-    with open(os.path.join(ckpt_path, "model_config.json"), "w") as f:
-        json.dump(config, f, indent=4)
-
     env = gym.make(args.env_name)
     env.reset()
 
     state_dim = len(env.observation_space.high)
-    if args.env_name in ["CartPole-v1"]:
-        discrete = True
+    if args.if_discrete_action:
         action_dim = env.action_space.n
     else:
-        discrete = False
         action_dim = env.action_space.shape[0]
 
     if torch.cuda.is_available():
@@ -51,10 +36,10 @@ def main(args):
     else:
         device = "cpu"
 
-    expert = Expert(state_dim, action_dim, discrete, **expert_config).to(device)
+    expert = Expert(state_dim, action_dim, args.if_discrete_action, **expert_config).to(device)
     expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
 
-    model = GAIL(state_dim, action_dim, discrete, config, args).to(device)
+    model = GAIL(state_dim, action_dim, args.if_discrete_action, config, args).to(device)
     results = model.train(env, expert)
     env.close()
 
@@ -72,12 +57,27 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env_name", type=str, default="CartPole-v1", help="[CartPole-v1, Pendulum-v0, BipedalWalker-v3]")
+
     parser.add_argument("--wandb", action="store_true", default=False)
     parser.add_argument("--wb_project", type=str, default="img-gen-rl")
     parser.add_argument("--wb_entity", type=str, default="rowing0914")
     parser.add_argument("--wb_run", type=str, default="vanilla")
     parser.add_argument("--wb_group", type=str, default="vanilla")
+
+    parser.add_argument("--if_discrete_action", action="store_true", default=False)
+    parser.add_argument("--num_iters", type=int, default=1000)
+    parser.add_argument("--num_steps_per_iter", type=int, default=5000)
+    parser.add_argument("--horizon", type=int, default=0)
+    parser.add_argument("--lambda", type=float, default=1e-3)
+    parser.add_argument("--gae_gamma", type=float, default=0.99)
+    parser.add_argument("--gae_lambda", type=float, default=0.99)
+    parser.add_argument("--epsilon", type=float, default=0.01)
+    parser.add_argument("--max_kl", type=float, default=0.01)
+    parser.add_argument("--cg_damping", type=float, default=0.1)
     args = parser.parse_args()
+    args.normalize_advantage = True
+    if args.horizon == 0:
+        args.horizon = None
 
     if args.wandb:
         wandb.login()

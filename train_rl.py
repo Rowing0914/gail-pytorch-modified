@@ -18,14 +18,6 @@ def main(env_name, model_name):
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    if model_name not in ["pg", "ac", "trpo", "gae", "ppo"]:
-        print("The model name is wrong!")
-        return
-
-    # if env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
-    #     print("The environment name is wrong!")
-    #     return
-
     ckpt_path = os.path.join(ckpt_path, model_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
@@ -34,21 +26,13 @@ def main(env_name, model_name):
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    with open("./rl/config.json") as f:
-        config = json.load(f)[env_name][model_name]
-
-    with open(os.path.join(ckpt_path, "model_config.json"), "w") as f:
-        json.dump(config, f, indent=4)
-
     env = gym.make(env_name)
     env.reset()
 
     state_dim = len(env.observation_space.high)
-    if env_name in ["CartPole-v1"]:
-        discrete = True
+    if args.if_discrete_action:
         action_dim = env.action_space.n
     else:
-        discrete = False
         action_dim = env.action_space.shape[0]
 
     if torch.cuda.is_available():
@@ -57,25 +41,15 @@ def main(env_name, model_name):
         device = "cpu"
 
     if model_name == "pg":
-        model = PolicyGradient(
-            state_dim, action_dim, discrete, **config
-        ).to(device)
+        model = PolicyGradient(state_dim, action_dim, discrete, **config).to(device)
     elif model_name == "ac":
-        model = ActorCritic(
-            state_dim, action_dim, discrete, **config
-        ).to(device)
+        model = ActorCritic(state_dim, action_dim, discrete, **config).to(device)
     elif model_name == "trpo":
-        model = TRPO(
-            state_dim, action_dim, discrete, **config
-        ).to(device)
+        model = TRPO(state_dim, action_dim, discrete, **config).to(device)
     elif model_name == "gae":
-        model = GAE(
-            state_dim, action_dim, discrete, **config
-        ).to(device)
+        model = GAE(state_dim, action_dim, discrete, **config).to(device)
     elif model_name == "ppo":
-        model = PPO(
-            state_dim, action_dim, discrete, **config
-        ).to(device)
+        model = PPO(state_dim, action_dim, discrete, **config).to(device)
 
     results = model.train(env)
 
@@ -85,32 +59,40 @@ def main(env_name, model_name):
         pickle.dump(results, f)
 
     if hasattr(model, "pi"):
-        torch.save(
-            model.pi.state_dict(), os.path.join(ckpt_path, "policy.ckpt")
-        )
+        torch.save(model.pi.state_dict(), os.path.join(ckpt_path, "policy.ckpt"))
     if hasattr(model, "v"):
-        torch.save(
-            model.v.state_dict(), os.path.join(ckpt_path, "value.ckpt")
-        )
+        torch.save(model.v.state_dict(), os.path.join(ckpt_path, "value.ckpt"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--env_name",
-        type=str,
-        default="CartPole-v1",
-        help="Type the environment name to run. \
-            The possible environments are \
-                [CartPole-v1, Pendulum-v0, BipedalWalker-v3]"
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default="trpo",
-        help="Type the model name to train. \
-            The possible models are [pg, ac, trpo, gae, ppo]"
-    )
-    args = parser.parse_args()
+    parser.add_argument("--env_name", type=str, default="CartPole-v1")
+    parser.add_argument("--model_name", type=str, default="trpo", help="[pg, ac, trpo, gae, ppo]")
 
+    parser.add_argument("--if_discrete_action", action="store_true", default=False)
+    parser.add_argument("--num_iters", type=int, default=1000)
+    parser.add_argument("--num_epochs", type=int, default=10)
+    parser.add_argument("--num_steps_per_iter", type=int, default=5000)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--horizon", type=int, default=0)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lambda", type=float, default=1e-3)
+    parser.add_argument("--discount", type=float, default=0.99)
+
+    parser.add_argument("--gae_gamma", type=float, default=0.99)
+    parser.add_argument("--gae_lambda", type=float, default=0.99)
+    parser.add_argument("--epsilon", type=float, default=0.01)
+
+    parser.add_argument("--max_kl", type=float, default=0.01)
+    parser.add_argument("--cg_damping", type=float, default=0.1)
+
+    parser.add_argument("--ppo_vf_coeff", type=int, default=1)
+    parser.add_argument("--ppo_entropy_coeff", type=float, default=0.01)
+    args = parser.parse_args()
+    args.normalize_advantage = True
+    args.use_baseline = True
+    if args.horizon == 0:
+        args.horizon = None
+    
     main(**vars(args))
+
