@@ -1,5 +1,4 @@
 import os
-import json
 import pickle
 import argparse
 import wandb
@@ -36,7 +35,7 @@ def main(args):
     else:
         device = "cpu"
 
-    expert = Expert(state_dim, action_dim, args.if_discrete_action, **expert_config).to(device)
+    expert = Expert(state_dim, action_dim, args.if_discrete_action).to(device)
     expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
 
     model = GAIL(state_dim, action_dim, args.if_discrete_action, config, args).to(device)

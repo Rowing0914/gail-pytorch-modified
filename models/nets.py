@@ -108,14 +108,12 @@ class Expert(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
     ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
-        self.train_config = train_config
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
 
