@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import wandb
 
 from torch.nn import Module
 
@@ -18,14 +19,14 @@ class ActorCritic(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
+        args=None,
     ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
-        self.train_config = train_config
+        self.args = args
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
         self.v = ValueNetwork(self.state_dim)
@@ -44,12 +45,12 @@ class ActorCritic(Module):
         return action
 
     def train(self, env, render=False):
-        lr = self.train_config["lr"]
-        num_iters = self.train_config["num_iters"]
-        num_steps_per_iter = self.train_config["num_steps_per_iter"]
-        horizon = self.train_config["horizon"]
-        discount = self.train_config["discount"]
-        normalize_advantage = self.train_config["normalize_advantage"]
+        lr = self.args.lr
+        num_iters = self.args.num_iters
+        num_steps_per_iter = self.args.num_steps_per_iter
+        horizon = self.args.horizon
+        discount = self.args.discount
+        normalize_advantage = self.args.normalize_advantage
 
         opt_pi = torch.optim.Adam(self.pi.parameters(), lr)
         opt_v = torch.optim.Adam(self.v.parameters(), lr)

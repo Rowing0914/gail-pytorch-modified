@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import wandb
 
 from torch.nn import Module
 
@@ -20,21 +21,21 @@ class TRPO(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
+        args=None
     ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
-        self.train_config = train_config
+        self.args = args
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
-        if self.train_config["use_baseline"]:
+        if self.args.use_baseline:
             self.v = ValueNetwork(self.state_dim)
 
     def get_networks(self):
-        if self.train_config["use_baseline"]:
+        if self.args.use_baseline:
             return [self.pi, self.v]
         else:
             return [self.pi]
@@ -50,20 +51,21 @@ class TRPO(Module):
         return action
 
     def train(self, env, render=False):
-        lr = self.train_config["lr"]
-        num_iters = self.train_config["num_iters"]
-        num_steps_per_iter = self.train_config["num_steps_per_iter"]
-        horizon = self.train_config["horizon"]
-        discount = self.train_config["discount"]
-        max_kl = self.train_config["max_kl"]
-        cg_damping = self.train_config["cg_damping"]
-        normalize_return = self.train_config["normalize_return"]
-        use_baseline = self.train_config["use_baseline"]
+        lr = self.args.lr
+        num_iters = self.args.num_iters
+        num_steps_per_iter = self.args.num_steps_per_iter
+        horizon = self.args.horizon
+        discount = self.args.discount
+        max_kl = self.args.max_kl
+        cg_damping = self.args.cg_damping
+        normalize_advantage = self.args.normalize_advantage
+        use_baseline = self.args.use_baseline
 
         if use_baseline:
             opt_v = torch.optim.Adam(self.v.parameters(), lr)
 
         rwd_iter_means = []
+        global_ts = 0
         for i in range(num_iters):
             rwd_iter = []
 
@@ -74,6 +76,7 @@ class TRPO(Module):
 
             steps = 0
             while steps < num_steps_per_iter:
+                global_ts += 1
                 ep_rwds = []
                 ep_disc_rwds = []
                 ep_disc = []
@@ -124,13 +127,15 @@ class TRPO(Module):
                 "Iterations: {},   Reward Mean: {}"
                 .format(i + 1, np.mean(rwd_iter))
             )
+            if self.args.wandb:
+                wandb.log(data={"train/ep_return": np.mean(rwd_iter)}, step=global_ts)
 
             obs = FloatTensor(np.array(obs))
             acts = FloatTensor(np.array(acts))
             rets = torch.cat(rets)
             disc = torch.cat(disc)
 
-            if normalize_return:
+            if normalize_advantage:
                 rets = (rets - rets.mean()) / rets.std()
 
             if use_baseline:

@@ -13,22 +13,23 @@ from rl.models.gae import GAE
 from rl.models.ppo import PPO
 
 
-def main(env_name, model_name):
+def main(args):
     ckpt_path = "ckpts"
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    ckpt_path = os.path.join(ckpt_path, model_name)
+    ckpt_path = os.path.join(ckpt_path, args.model_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    ckpt_path = os.path.join(ckpt_path, env_name)
+    ckpt_path = os.path.join(ckpt_path, args.env_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
-    env = gym.make(env_name)
+    env = gym.make(args.env_name)
     env.reset()
 
+    args.num_steps_per_iter = env.spec.max_episode_steps
     state_dim = len(env.observation_space.high)
     if args.if_discrete_action:
         action_dim = env.action_space.n
@@ -40,16 +41,16 @@ def main(env_name, model_name):
     else:
         device = "cpu"
 
-    if model_name == "pg":
-        model = PolicyGradient(state_dim, action_dim, discrete, **config).to(device)
-    elif model_name == "ac":
-        model = ActorCritic(state_dim, action_dim, discrete, **config).to(device)
-    elif model_name == "trpo":
-        model = TRPO(state_dim, action_dim, discrete, **config).to(device)
-    elif model_name == "gae":
-        model = GAE(state_dim, action_dim, discrete, **config).to(device)
-    elif model_name == "ppo":
-        model = PPO(state_dim, action_dim, discrete, **config).to(device)
+    if args.model_name == "pg":
+        model = PolicyGradient(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
+    elif args.model_name == "ac":
+        model = ActorCritic(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
+    elif args.model_name == "trpo":
+        model = TRPO(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
+    elif args.model_name == "gae":
+        model = GAE(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
+    elif args.model_name == "ppo":
+        model = PPO(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
 
     results = model.train(env)
 
@@ -66,6 +67,13 @@ def main(env_name, model_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # wandb
+    parser.add_argument("--wandb", action="store_true", default=False)
+    parser.add_argument("--wb_project", type=str, default="img-gen-rl")
+    parser.add_argument("--wb_entity", type=str, default="rowing0914")
+    parser.add_argument("--wb_run", type=str, default="vanilla")
+    parser.add_argument("--wb_group", type=str, default="vanilla")
+    
     parser.add_argument("--env_name", type=str, default="CartPole-v1")
     parser.add_argument("--model_name", type=str, default="trpo", help="[pg, ac, trpo, gae, ppo]")
 
@@ -76,7 +84,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--horizon", type=int, default=0)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--lambda", type=float, default=1e-3)
+    parser.add_argument("--lambda_", type=float, default=1e-3)
     parser.add_argument("--discount", type=float, default=0.99)
 
     parser.add_argument("--gae_gamma", type=float, default=0.99)
@@ -93,6 +101,11 @@ if __name__ == "__main__":
     args.use_baseline = True
     if args.horizon == 0:
         args.horizon = None
+
+    if args.wandb:
+        wandb.login()
+        wandb.init(project=args.wb_project, entity=args.wb_entity, name=args.wb_run, group=args.wb_group, dir="/tmp/wandb")
+        wandb.config.update(args)
     
-    main(**vars(args))
+    main(args)
 

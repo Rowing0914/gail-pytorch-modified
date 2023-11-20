@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-
+import wandb
 from torch.nn import Module
 
 from rl.models.nets import PolicyNetwork, ValueNetwork
@@ -20,14 +20,14 @@ class GAE(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
+        args=None
     ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
-        self.train_config = train_config
+        self.args = args
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
         self.v = ValueNetwork(self.state_dim)
@@ -46,15 +46,15 @@ class GAE(Module):
         return action
 
     def train(self, env, render=False):
-        num_iters = self.train_config["num_iters"]
-        num_steps_per_iter = self.train_config["num_steps_per_iter"]
-        horizon = self.train_config["horizon"]
-        gamma_ = self.train_config["gamma"]
-        lambda_ = self.train_config["lambda"]
-        eps = self.train_config["epsilon"]
-        max_kl = self.train_config["max_kl"]
-        cg_damping = self.train_config["cg_damping"]
-        normalize_advantage = self.train_config["normalize_advantage"]
+        num_iters = self.args.num_iters
+        num_steps_per_iter = self.args.num_steps_per_iter
+        horizon = self.args.horizon
+        gamma_ = self.args.gae_gamma
+        lambda_ = self.args.lambda_
+        eps = self.args.epsilon
+        max_kl = self.args.max_kl
+        cg_damping = self.args.cg_damping
+        normalize_advantage = self.args.normalize_advantage
 
         rwd_iter_means = []
         for i in range(num_iters):

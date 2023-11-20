@@ -18,14 +18,14 @@ class PPO(Module):
         state_dim,
         action_dim,
         discrete,
-        train_config=None
+        args=None
     ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
-        self.train_config = train_config
+        self.args = args
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
         self.v = ValueNetwork(self.state_dim)
@@ -44,18 +44,18 @@ class PPO(Module):
         return action
 
     def train(self, env, render=False):
-        lr = self.train_config["lr"]
-        num_iters = self.train_config["num_iters"]
-        num_steps_per_iter = self.train_config["num_steps_per_iter"]
-        num_epochs = self.train_config["num_epochs"]
-        minibatch_size = self.train_config["minibatch_size"]
-        horizon = self.train_config["horizon"]
-        gamma_ = self.train_config["gamma"]
-        lambda_ = self.train_config["lambda"]
-        eps = self.train_config["epsilon"]
-        c1 = self.train_config["vf_coeff"]
-        c2 = self.train_config["entropy_coeff"]
-        normalize_advantage = self.train_config["normalize_advantage"]
+        lr = self.args["lr"]
+        num_iters = self.args["num_iters"]
+        num_steps_per_iter = self.args["num_steps_per_iter"]
+        num_epochs = self.args["num_epochs"]
+        minibatch_size = self.args["minibatch_size"]
+        horizon = self.args["horizon"]
+        gamma_ = self.args["gamma"]
+        lambda_ = self.args["lambda"]
+        eps = self.args["epsilon"]
+        c1 = self.args["vf_coeff"]
+        c2 = self.args["entropy_coeff"]
+        normalize_advantage = self.args["normalize_advantage"]
 
         opt_pi = torch.optim.Adam(self.pi.parameters(), lr)
         opt_v = torch.optim.Adam(self.v.parameters(), lr)
