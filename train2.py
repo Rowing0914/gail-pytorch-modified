@@ -171,7 +171,7 @@ if __name__ == "__main__":
                         help="[CartPole-v1, Pendulum-v0, BipedalWalker-v3]")
 
     parser.add_argument("--wandb", action="store_true", default=False)
-    parser.add_argument("--wb_project", type=str, default="img-gen-rl-useless")
+    parser.add_argument("--wb_project", type=str, default="img-gen-rl")
     parser.add_argument("--wb_entity", type=str, default="rowing0914")
     parser.add_argument("--wb_run", type=str, default="vanilla")
     parser.add_argument("--wb_group", type=str, default="vanilla")
