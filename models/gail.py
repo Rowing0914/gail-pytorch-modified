@@ -32,7 +32,7 @@ class GAIL(Module):
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
         self.v = ValueNetwork(self.state_dim)
-        self.d = Discriminator(self.state_dim, self.action_dim, self.discrete)
+        self.d = Discriminator(self.state_dim, self.action_dim, self.discrete, args)
 
     def get_networks(self):
         return [self.pi, self.v]

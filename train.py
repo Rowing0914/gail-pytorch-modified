@@ -38,6 +38,19 @@ def main(args):
     expert = Expert(state_dim, action_dim, args.if_discrete_action).to(device)
     expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
 
+    # for Pendulum
+    config = {
+        "num_iters": 500,
+        "num_steps_per_iter": 2000,
+        "horizon": None,
+        "lambda": 1e-3,
+        "gae_gamma": 0.99,
+        "gae_lambda": 0.99,
+        "epsilon": 0.01,
+        "max_kl": 0.01,
+        "cg_damping": 0.1,
+        "normalize_advantage": True
+    }
     model = GAIL(state_dim, action_dim, args.if_discrete_action, config, args).to(device)
     results = model.train(env, expert)
     env.close()
@@ -64,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--wb_group", type=str, default="vanilla")
 
     parser.add_argument("--if_discrete_action", action="store_true", default=False)
+    parser.add_argument("--if_obs_only", action="store_true", default=False)
     parser.add_argument("--num_iters", type=int, default=1000)
     parser.add_argument("--num_steps_per_iter", type=int, default=5000)
     parser.add_argument("--horizon", type=int, default=0)

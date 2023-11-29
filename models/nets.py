@@ -65,8 +65,9 @@ class ValueNetwork(Module):
 
 
 class Discriminator(Module):
-    def __init__(self, state_dim, action_dim, discrete) -> None:
+    def __init__(self, state_dim, action_dim, discrete, args) -> None:
         super().__init__()
+        self.args = args
 
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -78,7 +79,10 @@ class Discriminator(Module):
             )
             self.net_in_dim = 2 * state_dim
         else:
-            self.net_in_dim = state_dim + action_dim
+            if self.args.if_obs_only:
+                self.net_in_dim = state_dim
+            else:
+                self.net_in_dim = state_dim + action_dim
 
         self.net = Sequential(
             Linear(self.net_in_dim, 50),
@@ -94,12 +98,13 @@ class Discriminator(Module):
         return torch.sigmoid(self.get_logits(states, actions))
 
     def get_logits(self, states, actions):
-        if self.discrete:
-            actions = self.act_emb(actions.long())
-
-        sa = torch.cat([states, actions], dim=-1)
-
-        return self.net(sa)
+        if self.args.if_obs_only:
+            _input = states
+        else:
+            if self.discrete:
+                actions = self.act_emb(actions.long())
+            _input = torch.cat([states, actions], dim=-1)
+        return self.net(_input)
 
 
 class Expert(Module):
