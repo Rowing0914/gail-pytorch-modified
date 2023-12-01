@@ -1,5 +1,5 @@
 import numpy as np
-import gym
+import gym, argparse, os
 from stable_baselines3 import SAC
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -9,59 +9,77 @@ from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
-from imitation.algorithms.adversarial.gail import GAIL
-from imitation.data import rollout
-from imitation.data.wrappers import RolloutInfoWrapper
-from imitation.rewards.reward_nets import BasicRewardNet
-from imitation.util.networks import RunningNorm
-from imitation.util.util import make_vec_env
+from imitation.src.imitation.algorithms.adversarial.gail import GAIL
+from imitation.src.imitation.data import rollout
+from imitation.src.imitation.data.wrappers import RolloutInfoWrapper
+from imitation.src.imitation.rewards.reward_nets import BasicRewardNet
+from imitation.src.imitation.util.networks import RunningNorm
+from imitation.src.imitation.util.util import make_vec_env
 import wandb
 
-if_wandb = True
-if_video = True
-num_envs = 8
-env_name = "HalfCheetah-v3"
-device = "cuda"
-log_root = "logs"
-seed = 2023
-max_episode_steps = 1000
-log_dir_expert = "./logs/expert-HalfCheetah-v3-1210841/2023"
-log_dir_learner = "./logs/learner-HalfCheetah-v3-1210841/2023"
+parser = argparse.ArgumentParser()
+# misc
+parser.add_argument("--wandb", action="store_true", default=False)
+parser.add_argument("--wb_project", type=str, default="img-gen-rl")
+parser.add_argument("--wb_entity", type=str, default="rowing0914")
+parser.add_argument("--wb_group", type=str, default="vanilla")
+parser.add_argument("--device", default="cuda")
+parser.add_argument("--log_root", default="logs")
 
-rng = np.random.default_rng(seed)
-# venv = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
-# expert = SAC("MlpPolicy", venv, device=device, verbose=1)
-# expert.load("./logs/HalfCheetah-v3-1210841/2023/best_model/best_model.zip")
+# training setup
+parser.add_argument("--policy_name", default="sac")  # OpenAI gym environment name
+parser.add_argument("--env_name", default="HalfCheetah-v3")  # OpenAI gym environment name
+parser.add_argument("--seed", default=2023, type=int)  # Sets Gym, PyTorch and Numpy seeds
+parser.add_argument("--num_envs", default=8, type=int)
+parser.add_argument("--max_episode_steps", default=1000, type=int)
+parser.add_argument("--train_steps", default=10_000_000, type=int)
+parser.add_argument("--num_eval_episodes", default=10, type=int)  # Sets Gym, PyTorch and Numpy seeds
+parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
+parser.add_argument("--if_save_weight", action="store_true", default=False)
+parser.add_argument("--if_no_use_state", action="store_false", default=True)
+parser.add_argument("--if_no_use_action", action="store_false", default=True)
 
-# rollouts = rollout.rollout(
-#     expert,
-#     make_vec_env(env_name, n_envs=num_envs, post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], rng=rng,),
-#     rollout.make_sample_until(min_timesteps=1000, min_episodes=60),
-#     rng=rng,
-# )
-# # import pudb; pudb.start()
-# rews = list()
-# ts_cnt = 0
-# for episode in rollouts:
-#     ts_cnt += episode.obs.shape[0]
-#     rews.append(episode.rews.sum())
-# print(f"Collected: {ts_cnt} transitions, Avg. Ep-Return: {np.mean(rews)}")
+# video related
+parser.add_argument("--if_video", action="store_true", default=False)
+parser.add_argument("--video_freq", default=10000, type=int)  # How often (time steps) we evaluate
+args = parser.parse_args()
 
-# with open("rollouts.pkl", "wb") as handle:
-#     pickle.dump(rollouts, handle, protocol=pickle.HIGHEST_PROTOCOL)
+from datetime import datetime
+t = datetime.now()
+run_name = f"agent-{args.policy_name}-{args.env_name}-seed{args.seed}-{t.month}{t.day}{t.hour}{t.minute}{t.second}"
+log_dir_agent = os.path.join(args.log_root, run_name)
+os.makedirs(log_dir_agent, exist_ok=True)
+
+if args.wandb:
+    wandb.login()
+    run = wandb.init(
+        project=args.wb_project, entity=args.wb_entity, name=run_name, group=args.wb_group, dir="/tmp/wandb",
+        # sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        # monitor_gym=True,  # auto-upload the videos of agents playing the game
+        )
+    wandb.config.update(args)
+
+rng = np.random.default_rng(args.seed)
+log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
 
 import pickle
 with open(f"{log_dir_expert}/rollouts.pkl", "rb") as handle:
     rollouts = pickle.load(handle)
 
-venv = make_vec_env(env_name, n_envs=8, rng=rng)
+venv = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
+venv.my_args = args
 # learner = SAC(env=venv, policy=MlpPolicy)
-learner = SAC("MlpPolicy", venv, device=device, verbose=1, tensorboard_log=log_dir_learner)
+learner = SAC("MlpPolicy", venv, device=args.device, verbose=0, tensorboard_log=log_dir_agent)
 reward_net = BasicRewardNet(
-    venv.observation_space,
-    venv.action_space,
+    observation_space=venv.observation_space,
+    action_space=venv.action_space,
     normalize_input_layer=RunningNorm,
+    use_state=args.if_no_use_state,
+    use_action=args.if_no_use_action,
+    use_next_state=False,
+    use_done=False,
 )
+
 gail_trainer = GAIL(
     demonstrations=rollouts,
     demo_batch_size=1024,
@@ -71,9 +89,13 @@ gail_trainer = GAIL(
     gen_algo=learner,
     reward_net=reward_net,
 )
-
+# import pudb; pudb.start()
+if args.wandb:
+    import wandb
+    rewards, _ = evaluate_policy(learner, venv, 10, return_episode_rewards=True)
+    wandb.log(data={"rollout/ep_rew_mean": np.mean(rewards)}, step=0)
 gail_trainer.train(100000)
-rewards, _ = evaluate_policy(learner, venv, 100, return_episode_rewards=True)
+rewards, _ = evaluate_policy(learner, venv, 10, return_episode_rewards=True)
 print("Rewards:", rewards)
 
 if if_wandb:

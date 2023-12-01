@@ -7,8 +7,22 @@ python cleaner.py "train_rl.py"
 
 # dev cmds
 CUDA_VISIBLE_DEVICES=0 python train_rl.py --env_name=HalfCheetah-v3 --seed=1
-python train_rollout.py
-python train_il.py
+CUDA_VISIBLE_DEVICES=0 python train_rollout.py
+CUDA_VISIBLE_DEVICES=1 python train_il.py --env_name=HalfCheetah-v3 --seed=1
+CUDA_VISIBLE_DEVICES=1 python train_il.py --env_name=HalfCheetah-v3 --seed=1 --if_no_use_state
+CUDA_VISIBLE_DEVICES=1 python train_il.py --env_name=HalfCheetah-v3 --seed=1 --if_no_use_action
+
+# ===== run IL
+# CUDA_VISIBLE_DEVICES=0 python train_il.py --env_name=HalfCheetah-v3 --seed=1 --wandb --wb_group=agent-HalfCheetah-v3-sac-1201 >&/dev/null &
+# CUDA_VISIBLE_DEVICES=1 python train_il.py --env_name=HalfCheetah-v3 --seed=2 --wandb --wb_group=agent-HalfCheetah-v3-sac-1201 >&/dev/null &
+# CUDA_VISIBLE_DEVICES=2 python train_il.py --env_name=HalfCheetah-v3 --seed=3 --wandb --wb_group=agent-HalfCheetah-v3-sac-1201 >&/dev/null &
+# CUDA_VISIBLE_DEVICES=0 python train_il.py --env_name=HalfCheetah-v3 --seed=4 --wandb --wb_group=agent-HalfCheetah-v3-sac-1201 >&/dev/null &
+
+CUDA_VISIBLE_DEVICES=0 python train_il.py --env_name=HalfCheetah-v3 --seed=1 --if_no_use_action --wandb --wb_group=agent-noAction-HalfCheetah-v3-sac-1201 >&/dev/null &
+CUDA_VISIBLE_DEVICES=1 python train_il.py --env_name=HalfCheetah-v3 --seed=2 --if_no_use_action --wandb --wb_group=agent-noAction-HalfCheetah-v3-sac-1201 >&/dev/null &
+CUDA_VISIBLE_DEVICES=2 python train_il.py --env_name=HalfCheetah-v3 --seed=3 --if_no_use_action --wandb --wb_group=agent-noAction-HalfCheetah-v3-sac-1201 >&/dev/null &
+CUDA_VISIBLE_DEVICES=0 python train_il.py --env_name=HalfCheetah-v3 --seed=4 --if_no_use_action --wandb --wb_group=agent-noAction-HalfCheetah-v3-sac-1201 >&/dev/null &
+
 
 # test cmds
 CUDA_VISIBLE_DEVICES=0 python train_rl.py --env_name=HalfCheetah-v3 --seed=1 --wandb --if_video --eval_freq=100 --video_freq=1

@@ -9,12 +9,12 @@ from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
-from imitation.algorithms.adversarial.gail import GAIL
-from imitation.data import rollout
-from imitation.data.wrappers import RolloutInfoWrapper
-from imitation.rewards.reward_nets import BasicRewardNet
-from imitation.util.networks import RunningNorm
-from imitation.util.util import make_vec_env
+from imitation.src.imitation.algorithms.adversarial.gail import GAIL
+from imitation.src.imitation.data import rollout
+from imitation.src.imitation.data.wrappers import RolloutInfoWrapper
+from imitation.src.imitation.rewards.reward_nets import BasicRewardNet
+from imitation.src.imitation.util.networks import RunningNorm
+from imitation.src.imitation.util.util import make_vec_env
 import wandb
 
 
@@ -26,7 +26,7 @@ device = "cuda"
 log_root = "logs"
 seed = 2023
 max_episode_steps = 1000
-log_dir_expert = "./logs/expert-HalfCheetah-v3-1210841/2023"
+log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
 
 rng = np.random.default_rng(seed)
 venv = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
@@ -36,7 +36,7 @@ expert.load(f"{log_dir_expert}/best_model/best_model.zip")
 rollouts = rollout.rollout(
     expert,
     make_vec_env(env_name, n_envs=num_envs, post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], rng=rng,),
-    rollout.make_sample_until(min_timesteps=1000, min_episodes=60),
+    rollout.make_sample_until(min_timesteps=10000, min_episodes=60),
     rng=rng,
 )
 # import pudb; pudb.start()
