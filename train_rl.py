@@ -1,111 +1,62 @@
-import os
-import json
-import pickle
-import argparse
-import wandb
-import torch
+import numpy as np
 import gym
+from stable_baselines3 import SAC
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.ppo import MlpPolicy
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.callbacks import EvalCallback, CallbackList
+from stable_baselines3.common.vec_env import VecVideoRecorder
+from wandb.integration.sb3 import WandbCallback
+import wandb
 
-from rl.models.pg import PolicyGradient
-from rl.models.ac import ActorCritic
-from rl.models.trpo import TRPO
-from rl.models.gae import GAE
-from rl.models.ppo import PPO
+if_wandb = True
+if_video = True
+num_envs = 8
+env_name = "HalfCheetah-v3"
+device = "cuda"
+log_root = "logs"
+seed = 2023
+max_episode_steps = 1000
+train_steps = 100_000
 
+import os
+from datetime import datetime
 
-def main(args):
-    ckpt_path = "ckpts"
-    if not os.path.isdir(ckpt_path):
-        os.mkdir(ckpt_path)
+t = datetime.now()
+log_dir_expert = os.path.join(log_root, f"expert-{env_name}-{t.month}{t.day}{t.hour}{t.minute}{t.second}", str(seed))
+os.makedirs(log_dir_expert, exist_ok=True)
 
-    ckpt_path = os.path.join(ckpt_path, args.model_name)
-    if not os.path.isdir(ckpt_path):
-        os.mkdir(ckpt_path)
+if if_wandb:
+    wandb.login()
+    run = wandb.init(
+        project="img-gen-rl", entity="rowing0914", name="motion-track", group="motion-track", dir="/tmp/wandb",
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        )
+    # wandb.config.update(config)
 
-    ckpt_path = os.path.join(ckpt_path, args.env_name)
-    if not os.path.isdir(ckpt_path):
-        os.mkdir(ckpt_path)
+venv = make_vec_env(env_name, n_envs=num_envs)
+eval_env = make_vec_env(env_name, n_envs=num_envs)
 
-    env = gym.make(args.env_name)
-    env.reset()
+if if_video and if_wandb:
+    # video_length = venv.envs[0].unwrapped.spec.max_episode_steps
+    video_length = max_episode_steps
+    eval_env = VecVideoRecorder(
+        venv=eval_env,
+        # video_folder=f"{log_dir_expert}/videos",
+        video_folder=f"/tmp/-videos",
+        name_prefix=f"SAC-expert-{env_name}",
+        record_video_trigger=lambda x: x % 10000 == 0,
+        video_length=video_length,
+    )
 
-    args.num_steps_per_iter = env.spec.max_episode_steps
-    state_dim = len(env.observation_space.high)
-    if args.if_discrete_action:
-        action_dim = env.action_space.n
-    else:
-        action_dim = env.action_space.shape[0]
+expert = SAC("MlpPolicy", venv, device=device, verbose=1, tensorboard_log=log_dir_expert)
+eval_callback = EvalCallback(eval_env, eval_freq=1000 * 2, best_model_save_path=f"{log_dir_expert}/best_model", log_path=log_dir_expert)
+callbacks = [eval_callback]
+if if_wandb:
+    callbacks.append(WandbCallback(verbose=2))
+expert.learn(train_steps, callback=CallbackList(callbacks))
 
-    if torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
-
-    if args.model_name == "pg":
-        model = PolicyGradient(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
-    elif args.model_name == "ac":
-        model = ActorCritic(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
-    elif args.model_name == "trpo":
-        model = TRPO(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
-    elif args.model_name == "gae":
-        model = GAE(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
-    elif args.model_name == "ppo":
-        model = PPO(state_dim, action_dim, args.if_discrete_action, args=args).to(device)
-
-    results = model.train(env)
-
-    env.close()
-
-    with open(os.path.join(ckpt_path, "results.pkl"), "wb") as f:
-        pickle.dump(results, f)
-
-    if hasattr(model, "pi"):
-        torch.save(model.pi.state_dict(), os.path.join(ckpt_path, "policy.ckpt"))
-    if hasattr(model, "v"):
-        torch.save(model.v.state_dict(), os.path.join(ckpt_path, "value.ckpt"))
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    # wandb
-    parser.add_argument("--wandb", action="store_true", default=False)
-    parser.add_argument("--wb_project", type=str, default="img-gen-rl")
-    parser.add_argument("--wb_entity", type=str, default="rowing0914")
-    parser.add_argument("--wb_run", type=str, default="vanilla")
-    parser.add_argument("--wb_group", type=str, default="vanilla")
-    
-    parser.add_argument("--env_name", type=str, default="CartPole-v1")
-    parser.add_argument("--model_name", type=str, default="trpo", help="[pg, ac, trpo, gae, ppo]")
-
-    parser.add_argument("--if_discrete_action", action="store_true", default=False)
-    parser.add_argument("--num_iters", type=int, default=1000)
-    parser.add_argument("--num_epochs", type=int, default=10)
-    parser.add_argument("--num_steps_per_iter", type=int, default=5000)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--horizon", type=int, default=0)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--lambda_", type=float, default=1e-3)
-    parser.add_argument("--discount", type=float, default=0.99)
-
-    parser.add_argument("--gae_gamma", type=float, default=0.99)
-    parser.add_argument("--gae_lambda", type=float, default=0.99)
-    parser.add_argument("--epsilon", type=float, default=0.01)
-
-    parser.add_argument("--max_kl", type=float, default=0.01)
-    parser.add_argument("--cg_damping", type=float, default=0.1)
-
-    parser.add_argument("--ppo_vf_coeff", type=int, default=1)
-    parser.add_argument("--ppo_entropy_coeff", type=float, default=0.01)
-    args = parser.parse_args()
-    args.normalize_advantage = True
-    args.use_baseline = True
-    if args.horizon == 0:
-        args.horizon = None
-
-    if args.wandb:
-        wandb.login()
-        wandb.init(project=args.wb_project, entity=args.wb_entity, name=args.wb_run, group=args.wb_group, dir="/tmp/wandb")
-        wandb.config.update(args)
-    
-    main(args)
-
+if if_wandb:
+    run.finish()

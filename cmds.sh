@@ -1,5 +1,14 @@
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin
+conda activate il
 
+CUDA_VISIBLE_DEVICES=0 python python train_rl.py
+python train_rollout.py
+python train_il.py
+
+# === benchmark
+CUDA_VISIBLE_DEVICES=0 nohup python python train_rl.py >&/dev/null &
+
+# ============ Old ones
 # Train expert
 python train_rl.py --env_name=HalfCheetah-v4 --model_name=trpo
 python train_rl.py --env_name=HalfCheetah-v4 --model_name=trpo --wandb --wb_group=trpo

@@ -136,3 +136,5 @@ ckpts
 # custom files
 results.ipynb
 .idea
+.mujoco
+logs
