@@ -1,6 +1,6 @@
 import numpy as np
 import gym, argparse, os
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, PPO, DDPG, TD3
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.ppo import MlpPolicy
@@ -71,8 +71,10 @@ venv = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
 venv_eval = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
 venv.my_args = args
 venv.venv_eval = venv_eval
-# learner = SAC(env=venv, policy=MlpPolicy)
-learner = SAC("MlpPolicy", venv, device=args.device, verbose=0, tensorboard_log=log_dir_agent)
+if args.policy_name == "sac":
+    learner = SAC("MlpPolicy", venv, device=args.device, verbose=0, tensorboard_log=log_dir_agent)
+elif args.policy_name == "ppo":
+    learner = PPO("MlpPolicy", venv, device=args.device, verbose=0, tensorboard_log=log_dir_agent)
 reward_net = BasicRewardNet(
     observation_space=venv.observation_space,
     action_space=venv.action_space,
