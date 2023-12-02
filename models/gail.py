@@ -64,16 +64,19 @@ class GAIL(Module):
         steps = 0
         while steps < num_steps_per_iter:
             ep_obs, ep_rwds, t = [], [], 0
-            (ob, _), done = env.reset(), False
+            # (ob, _), done = env.reset(), False
+            ob, done = env.reset(), False
 
             while not done and steps < num_steps_per_iter:
-                act = expert.act(ob)
+                act, _ = expert.predict(ob, deterministic=True)  # stable-baselines 3
+                # act = expert.act(ob)  # original
                 ep_obs.append(ob); exp_obs.append(ob); exp_acts.append(act)
 
                 if render:
                     env.render()
-                ob, rwd, done, truncated, _ = env.step(act)
-                done = truncated or done
+                # ob, rwd, done, truncated, _ = env.step(act)
+                # done = truncated or done
+                ob, rwd, done, _ = env.step(act)
 
                 ep_rwds.append(rwd)
                 t += 1
@@ -96,7 +99,8 @@ class GAIL(Module):
             while steps < num_steps_per_iter:
                 ep_obs, ep_acts, ep_rwds, ep_costs, ep_disc_costs, ep_gms, ep_lmbs = [], [], [], [], [], [], []
                 t = 0
-                (ob, _), done = env.reset(), False
+                # (ob, _), done = env.reset(), False
+                ob, done = env.reset(), False
 
                 while not done and steps < num_steps_per_iter:
                     act = self.act(ob)
@@ -104,8 +108,9 @@ class GAIL(Module):
 
                     if render:
                         env.render()
-                    ob, rwd, done, truncated, _ = env.step(act)
-                    done = truncated or done
+                    # ob, rwd, done, truncated, _ = env.step(act)
+                    # done = truncated or done
+                    ob, rwd, done, _ = env.step(act)
 
                     ep_rwds.append(rwd); ep_gms.append(gae_gamma ** t); ep_lmbs.append(gae_lambda ** t)
                     t += 1

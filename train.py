@@ -35,8 +35,12 @@ def main(args):
     else:
         device = "cpu"
 
-    expert = Expert(state_dim, action_dim, args.if_discrete_action).to(device)
-    expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
+    from stable_baselines3 import SAC, PPO, DDPG, TD3
+    expert = SAC("MlpPolicy", env, device=args.device, verbose=1)
+    expert = expert.load(f"{args.log_dir_expert}/best_model/best_model.zip")
+
+    # expert = Expert(state_dim, action_dim, args.if_discrete_action).to(device)
+    # expert.pi.load_state_dict(torch.load(os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device))
 
     # for Pendulum
     config = {
@@ -68,7 +72,11 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env_name", type=str, default="CartPole-v1", help="[CartPole-v1, Pendulum-v0, BipedalWalker-v3]")
+    parser.add_argument("--env_name", type=str, default="CartPole-v1", help="[CartPole-v1, Pendulum-v1, BipedalWalker-v3]")
+    parser.add_argument("--device", type=str, default="cuda")
+    # parser.add_argument("--log_dir_expert", default="./logs/expert-sac-Humanoid-v3-seed1-12124112/")
+    parser.add_argument("--log_dir_expert", default="./logs/expert-sac-HalfCheetah-v3-seed1-12124048/")
+    # parser.add_argument("--log_dir_expert", default="./logs/expert-sac-Pendulum-v1-seed1-122214334/")
 
     parser.add_argument("--wandb", action="store_true", default=False)
     parser.add_argument("--wb_project", type=str, default="img-gen-rl")

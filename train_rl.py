@@ -40,7 +40,7 @@ args = parser.parse_args()
 t = datetime.now()
 run_name = f"expert-{args.policy_name}-{args.env_name}-seed{args.seed}-{t.month}{t.day}{t.hour}{t.minute}{t.second}"
 log_dir_expert = os.path.join(args.log_root, run_name)
-os.makedirs(log_dir_expert, exist_ok=True)
+# os.makedirs(log_dir_expert, exist_ok=True)
 
 if args.wandb:
     wandb.login()
