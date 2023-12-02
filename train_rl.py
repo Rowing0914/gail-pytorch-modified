@@ -59,7 +59,6 @@ if args.if_video:
     video_length = args.max_episode_steps
     eval_env = VecVideoRecorder(
         venv=eval_env,
-        # video_folder=f"{log_dir_expert}/videos",
         video_folder=f"/tmp/-videos",
         name_prefix=f"SAC-expert-{args.env_name}",
         record_video_trigger=lambda x: x % args.video_freq == 0,

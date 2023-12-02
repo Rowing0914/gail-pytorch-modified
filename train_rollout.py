@@ -30,8 +30,15 @@ log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
 
 rng = np.random.default_rng(seed)
 venv = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
+venv_eval = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
 expert = SAC("MlpPolicy", venv, device=device, verbose=1)
-expert.load(f"{log_dir_expert}/best_model/best_model.zip")
+# import pudb; pudb.start()
+expert = expert.load(f"{log_dir_expert}/best_model/best_model.zip")
+
+print("Test pretrained expert!")
+from stable_baselines3.common.evaluation import evaluate_policy
+rewards, _ = evaluate_policy(expert, venv_eval, 10, return_episode_rewards=True)
+print("Pretrained expert: ", np.mean(rewards))
 
 rollouts = rollout.rollout(
     expert,

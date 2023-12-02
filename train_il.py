@@ -31,13 +31,14 @@ parser.add_argument("--policy_name", default="sac")  # OpenAI gym environment na
 parser.add_argument("--env_name", default="HalfCheetah-v3")  # OpenAI gym environment name
 parser.add_argument("--seed", default=2023, type=int)  # Sets Gym, PyTorch and Numpy seeds
 parser.add_argument("--num_envs", default=8, type=int)
+parser.add_argument("--gen_train_timesteps", default=1000, type=int)
 parser.add_argument("--max_episode_steps", default=1000, type=int)
 parser.add_argument("--train_steps", default=10_000_000, type=int)
 parser.add_argument("--num_eval_episodes", default=10, type=int)  # Sets Gym, PyTorch and Numpy seeds
-parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
+parser.add_argument("--eval_freq_by_round", default=100, type=int)  # How often (round) we evaluate
 parser.add_argument("--if_save_weight", action="store_true", default=False)
-parser.add_argument("--if_no_use_state", action="store_false", default=True)
-parser.add_argument("--if_no_use_action", action="store_false", default=True)
+parser.add_argument("--if_no_use_state", action="store_true", default=False)
+parser.add_argument("--if_no_use_action", action="store_true", default=False)
 
 # video related
 parser.add_argument("--if_video", action="store_true", default=False)
@@ -67,15 +68,17 @@ with open(f"{log_dir_expert}/rollouts.pkl", "rb") as handle:
     rollouts = pickle.load(handle)
 
 venv = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
+venv_eval = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
 venv.my_args = args
+venv.venv_eval = venv_eval
 # learner = SAC(env=venv, policy=MlpPolicy)
 learner = SAC("MlpPolicy", venv, device=args.device, verbose=0, tensorboard_log=log_dir_agent)
 reward_net = BasicRewardNet(
     observation_space=venv.observation_space,
     action_space=venv.action_space,
     normalize_input_layer=RunningNorm,
-    use_state=args.if_no_use_state,
-    use_action=args.if_no_use_action,
+    use_state=not args.if_no_use_state,
+    use_action=not args.if_no_use_action,
     use_next_state=False,
     use_done=False,
 )
@@ -84,18 +87,24 @@ gail_trainer = GAIL(
     demonstrations=rollouts,
     demo_batch_size=1024,
     gen_replay_buffer_capacity=2048,
-    n_disc_updates_per_round=4,
+    n_disc_updates_per_round=int(args.gen_train_timesteps * 0.5),
     venv=venv,
     gen_algo=learner,
     reward_net=reward_net,
+    gen_train_timesteps=args.gen_train_timesteps,
 )
 # import pudb; pudb.start()
 if args.wandb:
     import wandb
-    rewards, _ = evaluate_policy(learner, venv, 10, return_episode_rewards=True)
+    rewards, _ = evaluate_policy(learner, venv.venv_eval, 1, return_episode_rewards=True)
     wandb.log(data={"rollout/ep_rew_mean": np.mean(rewards)}, step=0)
-gail_trainer.train(100000)
-rewards, _ = evaluate_policy(learner, venv, 10, return_episode_rewards=True)
+    wandb.log(data={"eval/mean_reward": np.mean(rewards)}, step=0)
+gail_trainer.train(args.train_steps)
+rewards, _ = evaluate_policy(learner, venv.venv_eval, 10, return_episode_rewards=True)
+if args.wandb:
+    import wandb
+    wandb.log(data={"rollout/ep_rew_mean": np.mean(rewards)}, step=gail_trainer._global_step + 1)
+    wandb.log(data={"eval/mean_reward": np.mean(rewards)}, step=gail_trainer._global_step + 1)
 print("Rewards:", rewards)
 
 if if_wandb:
