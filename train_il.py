@@ -43,6 +43,8 @@ parser.add_argument("--if_no_use_action", action="store_true", default=False)
 # video related
 parser.add_argument("--if_video", action="store_true", default=False)
 parser.add_argument("--video_freq", default=10000, type=int)  # How often (time steps) we evaluate
+parser.add_argument("--log_dir_expert", default="./logs/expert-sac-Humanoid-v3-seed1-12124112/")
+# parser.add_argument("--log_dir_expert", default="./logs/expert-sac-HalfCheetah-v3-seed1-12124048/")
 args = parser.parse_args()
 
 from datetime import datetime
@@ -61,11 +63,9 @@ if args.wandb:
     wandb.config.update(args)
 
 rng = np.random.default_rng(args.seed)
-# log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
-log_dir_expert = "./logs/expert-sac-Humanoid-v3-seed1-12124112/"
 
 import pickle
-with open(f"{log_dir_expert}/rollouts.pkl", "rb") as handle:
+with open(f"{args.log_dir_expert}/rollouts.pkl", "rb") as handle:
     rollouts = pickle.load(handle)
 
 venv = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng)
@@ -95,6 +95,7 @@ gail_trainer = GAIL(
     gen_algo=learner,
     reward_net=reward_net,
     gen_train_timesteps=args.gen_train_timesteps,
+    allow_variable_horizon=True if args.env_name == "Humanoid-v3" else False,
 )
 # import pudb; pudb.start()
 if args.wandb:
