@@ -49,7 +49,7 @@ from datetime import datetime
 t = datetime.now()
 run_name = f"agent-{args.policy_name}-{args.env_name}-seed{args.seed}-{t.month}{t.day}{t.hour}{t.minute}{t.second}"
 log_dir_agent = os.path.join(args.log_root, run_name)
-os.makedirs(log_dir_agent, exist_ok=True)
+# os.makedirs(log_dir_agent, exist_ok=True)
 
 if args.wandb:
     wandb.login()
@@ -61,7 +61,8 @@ if args.wandb:
     wandb.config.update(args)
 
 rng = np.random.default_rng(args.seed)
-log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
+# log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
+log_dir_expert = "./logs/expert-sac-Humanoid-v3-seed1-12124112/"
 
 import pickle
 with open(f"{log_dir_expert}/rollouts.pkl", "rb") as handle:

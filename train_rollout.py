@@ -1,6 +1,6 @@
 import numpy as np
-import gym
-from stable_baselines3 import SAC
+import gym, argparse, os
+from stable_baselines3 import SAC, PPO, DDPG, TD3
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.ppo import MlpPolicy
@@ -17,23 +17,26 @@ from imitation.src.imitation.util.networks import RunningNorm
 from imitation.src.imitation.util.util import make_vec_env
 import wandb
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--device", default="cuda")
+parser.add_argument("--policy_name", default="sac")  # OpenAI gym environment name
+parser.add_argument("--env_name", default="HalfCheetah-v3")  # OpenAI gym environment name
+parser.add_argument("--seed", default=2023, type=int)  # Sets Gym, PyTorch and Numpy seeds
+parser.add_argument("--num_envs", default=8, type=int)
+parser.add_argument("--gen_train_timesteps", default=1000, type=int)
+parser.add_argument("--max_episode_steps", default=1000, type=int)
+parser.add_argument("--train_steps", default=10_000_000, type=int)
+parser.add_argument("--num_eval_episodes", default=10, type=int)  # Sets Gym, PyTorch and Numpy seeds
+parser.add_argument("--log_dir_expert", default="./logs/expert-sac-Humanoid-v3-seed1-12124112/")
+# parser.add_argument("--log_dir_expert", default="./logs/expert-sac-HalfCheetah-v3-seed1-12124048/")
+args = parser.parse_args()
 
-if_wandb = True
-if_video = True
-num_envs = 8
-env_name = "HalfCheetah-v3"
-device = "cuda"
-log_root = "logs"
-seed = 2023
-max_episode_steps = 1000
-log_dir_expert = "./logs/expert-sac-HalfCheetah-v3-seed1-12124048/"
-
-rng = np.random.default_rng(seed)
-venv = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
-venv_eval = make_vec_env(env_name, n_envs=num_envs, rng=rng,)
-expert = SAC("MlpPolicy", venv, device=device, verbose=1)
+rng = np.random.default_rng(args.seed)
+venv = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng,)
+venv_eval = make_vec_env(args.env_name, n_envs=args.num_envs, rng=rng,)
+expert = SAC("MlpPolicy", venv, device=args.device, verbose=1)
 # import pudb; pudb.start()
-expert = expert.load(f"{log_dir_expert}/best_model/best_model.zip")
+expert = expert.load(f"{args.log_dir_expert}/best_model/best_model.zip")
 
 print("Test pretrained expert!")
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -42,7 +45,7 @@ print("Pretrained expert: ", np.mean(rewards))
 
 rollouts = rollout.rollout(
     expert,
-    make_vec_env(env_name, n_envs=num_envs, post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], rng=rng,),
+    make_vec_env(args.env_name, n_envs=args.num_envs, post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], rng=rng,),
     rollout.make_sample_until(min_timesteps=10000, min_episodes=60),
     rng=rng,
 )
