@@ -5,6 +5,9 @@ conda activate il
 nvidia-smi
 python cleaner.py "train_il.py"
 
+python -m imitation.src.imitation.scripts.train_adversarial gail with gail_seals_walker seed=1
+
+
 # dev cmds
 CUDA_VISIBLE_DEVICES=0 python train_rl.py --env_name=HalfCheetah-v3 --seed=1
 CUDA_VISIBLE_DEVICES=0 python train_rollout.py --env_name=Humanoid-v3
