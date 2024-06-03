@@ -60,7 +60,7 @@ if args.if_video:
     eval_env = VecVideoRecorder(
         venv=eval_env,
         video_folder=f"/tmp/-videos",
-        name_prefix=f"SAC-expert-{args.env_name}",
+        name_prefix=f"{args.policy_name}-expert-{args.env_name}",
         record_video_trigger=lambda x: x % args.video_freq == 0,
         video_length=video_length,
     )
